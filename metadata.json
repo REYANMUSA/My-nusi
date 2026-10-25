@@ -1,0 +1,6 @@
+{
+  "name": "Nusi — Personal Daily Progress",
+  "description": "A private, minimalist daily progress app for discipline, faith, focus, and honest personal growth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
