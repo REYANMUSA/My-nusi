@@ -151,12 +151,9 @@ const INITIAL_SCHEDULE: ScheduleItem[] = [
 ];
 
 const INITIAL_TASKS: TaskItem[] = [
-  { id: 't_1', title: 'Edit product photos', area: 'find_niche', completed: false, focusMinutes: 0 },
-  { id: 't_2', title: 'Post video', area: 'find_niche', completed: false, focusMinutes: 0 },
-  { id: 't_3', title: 'Review account', area: 'find_niche', completed: false, focusMinutes: 0 },
-  { id: 't_4', title: 'Edit video', area: 'quran_nature', completed: false, focusMinutes: 0 },
-  { id: 't_5', title: 'Study maths', area: 'school', completed: false, focusMinutes: 0 },
-  { id: 't_6', title: "Read Qur'an", area: 'quran_nature', completed: false, focusMinutes: 0 },
+  { id: 't_1', title: 'Find product', area: 'find_niche', completed: false, focusMinutes: 0 },
+  { id: 't_2', title: 'Edit video', area: 'find_niche', completed: false, focusMinutes: 0 },
+  { id: 't_3', title: 'Review video', area: 'find_niche', completed: false, focusMinutes: 0 },
 ];
 
 const AppContext = createContext<AppContextValue | null>(null);

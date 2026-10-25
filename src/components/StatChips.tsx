@@ -11,8 +11,6 @@ export const StatChips: React.FC = () => {
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const totalCount = tasks.length;
-  // Factual missed tasks count (e.g., past due or unfinished from today)
-  const missedCount = 0;
 
   const cardStyle = settings.reduceTransparency ? 'solid-chip' : 'glass-chip';
 
@@ -34,11 +32,11 @@ export const StatChips: React.FC = () => {
         </span>
       </div>
 
-      {/* Missed */}
+      {/* Remaining tasks (tasks have no due-time field, so don't report fake missed counts) */}
       <div className={`px-3 py-1.5 flex items-center gap-2 ${cardStyle}`}>
-        <span className="text-[11px] font-medium text-white/50">Missed</span>
+        <span className="text-[11px] font-medium text-white/50">Remaining</span>
         <span className="text-xs font-semibold tabular-nums text-white/90">
-          {missedCount}
+          {Math.max(0, totalCount - completedCount)}
         </span>
       </div>
     </div>
