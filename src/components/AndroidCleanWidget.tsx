@@ -61,7 +61,7 @@ export const AndroidCleanWidget: React.FC = () => {
         </div>
 
         <p className="text-[11px] text-white/50 mb-4 leading-relaxed">
-          Pristine home-screen companion for quick glances and 1-tap focus on Android.
+          In-app preview of the compact clock, prayer countdown and quick-focus layout.
         </p>
 
         {/* The Clean Widget Canvas (Simulating Android 14/15 Frosted Glass 4x2 Widget) */}
@@ -141,7 +141,7 @@ export const AndroidCleanWidget: React.FC = () => {
             <span>Add to Android Home Screen</span>
           </div>
           <p className="leading-relaxed text-white/60">
-            Open browser menu (<strong>⋮</strong>) and tap <strong>&ldquo;Add to Home screen&rdquo;</strong> or <strong>&ldquo;Install App&rdquo;</strong>. Nusi will run cleanly with offline storage, system alarms, and clean notifications.
+            Open browser menu (<strong>⋮</strong>) and tap <strong>&ldquo;Add to Home screen&rdquo;</strong> or <strong>&ldquo;Install App&rdquo;</strong>. This adds an app shortcut, not a native Android home-screen widget. Browser reminders are not guaranteed when the app is closed.
           </p>
         </div>
 

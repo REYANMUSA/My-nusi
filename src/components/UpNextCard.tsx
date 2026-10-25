@@ -25,7 +25,28 @@ export const UpNextCard: React.FC = () => {
     );
   }
 
-  const [primaryNext, ...upcomingList] = scheduleItems;
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const ordered = [...scheduleItems].sort((a, b) => {
+    const [ah, am] = a.startTime.split(':').map(Number);
+    const [bh, bm] = b.startTime.split(':').map(Number);
+    return ah * 60 + am - (bh * 60 + bm);
+  });
+  const activeItem = ordered.find((item) => {
+    const [sh, sm] = item.startTime.split(':').map(Number);
+    const [eh, em] = item.endTime.split(':').map(Number);
+    return currentMinutes >= sh * 60 + sm && currentMinutes < eh * 60 + em;
+  });
+  const primaryNext = activeItem || ordered.find((item) => {
+    const [h, m] = item.startTime.split(':').map(Number);
+    return h * 60 + m > currentMinutes;
+  });
+  const upcomingList = primaryNext
+    ? ordered.filter((item) => item.id !== primaryNext.id && (() => {
+        const [h, m] = item.startTime.split(':').map(Number);
+        return h * 60 + m > currentMinutes;
+      })())
+    : [];
 
   const getContextIcon = (title: string) => {
     const lower = title.toLowerCase();
@@ -35,8 +56,15 @@ export const UpNextCard: React.FC = () => {
     return <Clock className="w-4 h-4 text-white/70" />;
   };
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  if (!primaryNext) {
+    return (
+      <section className={`p-4 sm:p-5 ${cardStyle}`}>
+        <h2 className="text-sm font-semibold tracking-tight text-white/95 mb-2">Up next</h2>
+        <p className="text-xs text-white/50 py-3 text-center">All planned activities are finished for today.</p>
+      </section>
+    );
+  }
+
   const [startH, startM] = primaryNext.startTime.split(':').map(Number);
   const [endH, endM] = primaryNext.endTime.split(':').map(Number);
   const startMinutes = startH * 60 + startM;

@@ -20,6 +20,7 @@ export const ProgressScreen: React.FC = () => {
 
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const maxFocus = Math.max(...weeklyFocusMinutes, 60);
+  const todayWeekIndex = (new Date().getDay() + 6) % 7;
 
   const completedTasks = tasks.filter((t) => t.completed);
   const unfinishedTasks = tasks.filter((t) => !t.completed);
@@ -47,7 +48,7 @@ export const ProgressScreen: React.FC = () => {
             const fraction = weeklyRingsFraction[idx] || 0;
             const isCompleted = fraction >= 0.99;
             const isPartial = fraction > 0 && fraction < 0.99;
-            const isFuture = idx > 4; // Sat & Sun future
+            const isFuture = idx > todayWeekIndex;
 
             return (
               <div key={day} className="flex flex-col items-center gap-1.5">
@@ -183,9 +184,9 @@ export const ProgressScreen: React.FC = () => {
           </div>
 
           <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-            <span className="text-[10px] text-white/45 block">Week Target</span>
+            <span className="text-[10px] text-white/45 block">Days logged</span>
             <span className="text-lg font-bold text-white tabular-nums">
-              {quran.weeklyCompletedDays.filter(Boolean).length}/5
+              {quran.weeklyCompletedDays.filter(Boolean).length}/7
             </span>
           </div>
         </div>

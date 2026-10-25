@@ -4,7 +4,6 @@ import {
   AccentConfig,
   AppSettings,
   DailyPath,
-  ExerciseItem,
   FocusSession,
   GymDayType,
   GymSession,
@@ -47,6 +46,7 @@ interface AppContextValue {
   isFriday: boolean;
   streak: StreakData;
   resetCurrentStreak: () => void;
+  confirmStreakDay: () => void;
   focusSession: FocusSession | null;
   startFocus: (durationMinutes: number, task?: { id?: string; title: string }) => void;
   pauseFocus: () => void;
@@ -75,7 +75,20 @@ interface AppContextValue {
   setShowWidgetPreview: (open: boolean) => void;
 }
 
-const STORAGE_KEY = 'nusi_app_state_v2';
+const STORAGE_KEY = 'nusi_app_state_v3';
+
+const localDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+};
+
+const localWeekKey = (date = new Date()) => {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return localDateKey(monday);
+};
 
 const DEFAULT_PRAYER_TIMES: PrayerTimes = {
   fajr: '05:15',
@@ -92,9 +105,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   reduceTransparency: false,
   defaultFocusDuration: 25,
   breakLengthPreference: 5,
-  userName: 'Reyan',
+  userName: 'You',
   loveStrengtheningNotes:
-    'Her steadfast loyalty and belief in me. Building an honorable, disciplined life to marry her and give her peace.',
+    'Build a life rooted in faith, discipline, and kindness. Take one honest step toward your future each day.',
   prayerTimes: DEFAULT_PRAYER_TIMES,
   notifications: {
     scheduleReminders: true,
@@ -141,9 +154,9 @@ const INITIAL_TASKS: TaskItem[] = [
   { id: 't_1', title: 'Edit product photos', area: 'find_niche', completed: false, focusMinutes: 0 },
   { id: 't_2', title: 'Post video', area: 'find_niche', completed: false, focusMinutes: 0 },
   { id: 't_3', title: 'Review account', area: 'find_niche', completed: false, focusMinutes: 0 },
-  { id: 't_4', title: 'Edit video', area: 'quran_nature', completed: true, focusMinutes: 35 },
+  { id: 't_4', title: 'Edit video', area: 'quran_nature', completed: false, focusMinutes: 0 },
   { id: 't_5', title: 'Study maths', area: 'school', completed: false, focusMinutes: 0 },
-  { id: 't_6', title: "Read Qur'an", area: 'quran_nature', completed: true, focusMinutes: 23 },
+  { id: 't_6', title: "Read Qur'an", area: 'quran_nature', completed: false, focusMinutes: 0 },
 ];
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -159,6 +172,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedPath, setSelectedPath] = useState<DailyPath>('locked_in');
   const [primaryWorkArea, setPrimaryWorkArea] = useState<WorkArea>('find_niche');
   const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [lastActiveDate, setLastActiveDate] = useState(localDateKey());
+  const [lastWeekKey, setLastWeekKey] = useState(localWeekKey());
 
   // Prayer Times (no checklist marks, remaining times calculated live)
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes>(DEFAULT_PRAYER_TIMES);
@@ -167,22 +183,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Qur'an Revision
   const [quran, setQuran] = useState<QuranProgress>({
     targetPages: 4,
-    completedPagesToday: 2,
+    completedPagesToday: 0,
     currentJuz: 3,
     weakestPage: 18,
-    weeklyCompletedDays: [true, true, true, true, false, false, false],
+    weeklyCompletedDays: [false, false, false, false, false, false, false],
   });
 
   // Gym day index: 0 = Sun, 1 = Mon, ..., 6 = Sat
   const [selectedGymDay, setSelectedGymDay] = useState<number>(new Date().getDay());
-  const [userWorkouts, setUserWorkouts] = useState<Record<GymDayType, ExerciseItem[]>>(WORKOUT_EXERCISES);
-  const [gymCompletedMap, setGymCompletedMap] = useState<Record<number, boolean>>({});
+  const [exerciseCompletionMap, setExerciseCompletionMap] = useState<Record<string, boolean>>({});
+  const [gymCompletedMap, setGymCompletedMap] = useState<Record<string, boolean>>({});
 
   // Streak
   const [streak, setStreak] = useState<StreakData>({
-    current: 23,
-    best: 47,
-    startDate: new Date(Date.now() - 23 * 86400000).toISOString().split('T')[0],
+    current: 0,
+    best: 0,
+    startDate: localDateKey(),
     history: [],
   });
 
@@ -191,9 +207,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Focus Timer
   const [focusSession, setFocusSession] = useState<FocusSession | null>(null);
-  const [todayFocusMinutes, setTodayFocusMinutes] = useState(58);
+  const [todayFocusMinutes, setTodayFocusMinutes] = useState(0);
   const dailyFocusGoalMinutes = 180;
-  const [weeklyFocusMinutes, setWeeklyFocusMinutes] = useState<number[]>([45, 60, 50, 58, 30, 0, 0]);
+  const [weeklyFocusMinutes, setWeeklyFocusMinutes] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
 
   // Schedule items
   const [scheduleItems] = useState<ScheduleItem[]>(INITIAL_SCHEDULE);
@@ -221,29 +237,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
+      const today = localDateKey();
+      const thisWeek = localWeekKey();
       if (saved) {
         const p = JSON.parse(saved);
+        const isNewDay = Boolean(p.lastActiveDate && p.lastActiveDate !== today);
+        const isNewWeek = Boolean(p.lastWeekKey && p.lastWeekKey !== thisWeek);
         if (p.selectedPath) setSelectedPath(p.selectedPath);
         if (p.primaryWorkArea) setPrimaryWorkArea(p.primaryWorkArea);
-        if (Array.isArray(p.tasks)) setTasks(p.tasks);
-        if (p.prayerTimes) setPrayerTimes(p.prayerTimes);
-        if (p.quran) setQuran(p.quran);
+        if (Array.isArray(p.tasks)) setTasks(isNewDay ? p.tasks.map((task: TaskItem) => ({ ...task, completed: false, completedAt: undefined })) : p.tasks);
+        if (p.prayerTimes) setPrayerTimes({ ...DEFAULT_PRAYER_TIMES, ...p.prayerTimes });
+        if (p.quran) setQuran({
+          ...p.quran,
+          completedPagesToday: isNewDay ? 0 : (p.quran.completedPagesToday || 0),
+          weeklyCompletedDays: isNewWeek ? [false, false, false, false, false, false, false] : (p.quran.weeklyCompletedDays || [false, false, false, false, false, false, false]),
+        });
         if (p.streak) setStreak(p.streak);
-        if (p.settings) setSettings({ ...DEFAULT_SETTINGS, ...p.settings });
-        if (typeof p.todayFocusMinutes === 'number') setTodayFocusMinutes(p.todayFocusMinutes);
-        if (Array.isArray(p.weeklyFocusMinutes)) setWeeklyFocusMinutes(p.weeklyFocusMinutes);
+        if (p.settings) setSettings({ ...DEFAULT_SETTINGS, ...p.settings, notifications: { ...DEFAULT_SETTINGS.notifications, ...(p.settings.notifications || {}) } });
+        if (!isNewDay && typeof p.todayFocusMinutes === 'number') setTodayFocusMinutes(p.todayFocusMinutes);
+        if (Array.isArray(p.weeklyFocusMinutes) && !isNewWeek) setWeeklyFocusMinutes(p.weeklyFocusMinutes);
         if (p.gymCompletedMap) setGymCompletedMap(p.gymCompletedMap);
-        if (p.userWorkouts) setUserWorkouts(p.userWorkouts);
+        if (p.exerciseCompletionMap) setExerciseCompletionMap(p.exerciseCompletionMap);
+        if (!isNewDay && p.focusSession) setFocusSession({ ...p.focusSession, isPaused: true });
       }
+      setLastActiveDate(today);
+      setLastWeekKey(thisWeek);
     } catch {
-      // Ignore parse failure
+      // Ignore corrupted or unavailable saved state and keep clean defaults
+    } finally {
+      setHasLoaded(true);
     }
   }, []);
 
-  // Persistent storage save
+  // Persistent storage save; wait for the initial read before writing defaults.
   useEffect(() => {
+    if (!hasLoaded) return;
     try {
       const payload = {
+        lastActiveDate,
+        lastWeekKey,
+        focusSession,
         selectedPath,
         primaryWorkArea,
         tasks,
@@ -254,13 +287,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         todayFocusMinutes,
         weeklyFocusMinutes,
         gymCompletedMap,
-        userWorkouts,
+        exerciseCompletionMap,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Storage restricted
     }
   }, [
+    hasLoaded,
+    lastActiveDate,
+    lastWeekKey,
+    focusSession,
     selectedPath,
     primaryWorkArea,
     tasks,
@@ -271,8 +308,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     todayFocusMinutes,
     weeklyFocusMinutes,
     gymCompletedMap,
-    userWorkouts,
+    exerciseCompletionMap,
   ]);
+
+  // Roll daily counters over automatically when the local calendar changes.
+  useEffect(() => {
+    const today = localDateKey(currentTime);
+    const thisWeek = localWeekKey(currentTime);
+    if (today !== lastActiveDate) {
+      setLastActiveDate(today);
+      setTasks((cur) => cur.map((task) => ({ ...task, completed: false, completedAt: undefined })));
+      setQuran((cur) => ({ ...cur, completedPagesToday: 0 }));
+      setTodayFocusMinutes(0);
+      setFocusSession(null);
+    }
+    if (thisWeek !== lastWeekKey) {
+      setLastWeekKey(thisWeek);
+      setWeeklyFocusMinutes([0, 0, 0, 0, 0, 0, 0]);
+      setQuran((cur) => ({ ...cur, weeklyCompletedDays: [false, false, false, false, false, false, false] }));
+      setGymCompletedMap({});
+      setExerciseCompletionMap({});
+    }
+  }, [currentTime, lastActiveDate, lastWeekKey]);
 
   // Real-time Salat Remaining Time Calculation (no checklist marks!)
   const { prayersInfo, nextPrayer } = useMemo(() => {
@@ -343,11 +400,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [prayerTimes, currentTime]);
 
   // Is today Friday?
-  const isFriday = useMemo(() => new Date().getDay() === 5, []);
+  const isFriday = useMemo(() => currentTime.getDay() === 5, [currentTime]);
 
   // Gym Session derived from user's exact schedule
   const gymScheduleEntry = WEEKLY_GYM_SCHEDULE[selectedGymDay] || WEEKLY_GYM_SCHEDULE[1];
-  const activeExercises = userWorkouts[gymScheduleEntry.type] || [];
+  const weekKey = localWeekKey(currentTime);
+  const exerciseKeyPrefix = weekKey + ':' + selectedGymDay + ':';
+  const activeExercises = (WORKOUT_EXERCISES[gymScheduleEntry.type] || []).map((exercise) => ({
+    ...exercise,
+    completed: !!exerciseCompletionMap[exerciseKeyPrefix + exercise.id],
+  }));
 
   const gym: GymSession = useMemo(
     () => ({
@@ -358,27 +420,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timeRange: gymScheduleEntry.timeRange,
       isRestDay: gymScheduleEntry.isRestDay,
       exercises: activeExercises,
-      completed: !!gymCompletedMap[selectedGymDay],
+      completed: !!gymCompletedMap[weekKey + ':' + selectedGymDay],
     }),
-    [gymScheduleEntry, activeExercises, gymCompletedMap, selectedGymDay]
+    [gymScheduleEntry, activeExercises, gymCompletedMap, selectedGymDay, weekKey]
   );
 
   const toggleExercise = (exerciseId: string) => {
-    setUserWorkouts((prev) => {
-      const type = gymScheduleEntry.type;
-      const list = prev[type] || [];
-      const updated = list.map((ex) =>
-        ex.id === exerciseId ? { ...ex, completed: !ex.completed } : ex
-      );
-      return { ...prev, [type]: updated };
-    });
+    const key = weekKey + ':' + selectedGymDay + ':' + exerciseId;
+    setExerciseCompletionMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleGymSessionCompleted = () => {
-    setGymCompletedMap((prev) => ({
-      ...prev,
-      [selectedGymDay]: !prev[selectedGymDay],
-    }));
+    const key = weekKey + ':' + selectedGymDay;
+    setGymCompletedMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const updatePrayerTime = (prayer: PrayerKey, time: string) => {
@@ -396,10 +450,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications: { ...s.notifications, permissionStatus: result },
       }));
       if (result === 'granted') {
-        playSereneChime();
+        if (settings.notifications.soundEnabled) playSereneChime();
         new Notification('Nusi · Notifications Active', {
-          body: 'Alarms and schedule reminders are set for your day.',
-          icon: '/favicon.ico',
+          body: 'System notifications are permitted. Reminder delivery depends on browser activity.',
+          icon: import.meta.env.BASE_URL + 'icon.svg',
         });
         return true;
       }
@@ -410,11 +464,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const triggerTestAlarm = () => {
-    playSereneChime();
+    if (settings.notifications.soundEnabled) playSereneChime();
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       new Notification('Nusi · Schedule Reminder', {
         body: 'School begins at 07:00 AM · Maths & Core Subjects',
-        icon: '/favicon.ico',
+        icon: import.meta.env.BASE_URL + 'icon.svg',
       });
     }
   };
@@ -427,36 +481,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       const secs = now.getSeconds();
-
-      // Only check on the minute mark (seconds < 5)
+      // Browser reminders are only reliable while the app is running.
       if (secs > 5) return;
+      if (settings.notifications.quietRestDays && selectedPath === 'rest') return;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const quietStartParts = settings.notifications.quietHoursStart.split(':').map(Number);
+      const quietEndParts = settings.notifications.quietHoursEnd.split(':').map(Number);
+      const quietStart = quietStartParts[0] * 60 + quietStartParts[1];
+      const quietEnd = quietEndParts[0] * 60 + quietEndParts[1];
+      const isQuiet = quietStart === quietEnd ? false : quietStart < quietEnd ? nowMinutes >= quietStart && nowMinutes < quietEnd : nowMinutes >= quietStart || nowMinutes < quietEnd;
+      if (isQuiet) return;
 
       // School alarm at 07:00
       if (timeStr === '07:00') {
-        playSereneChime();
+        if (settings.notifications.soundEnabled) playSereneChime();
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Nusi · School Reminder', {
             body: 'School time: 07:00 to 10:00. Time to lock in.',
-            icon: '/favicon.ico',
+            icon: import.meta.env.BASE_URL + 'icon.svg',
           });
         }
       }
 
       // Gym alarm at 16:30 if not Friday rest
       if (timeStr === '16:30' && now.getDay() !== 5) {
-        playSereneChime();
+        if (settings.notifications.soundEnabled) playSereneChime();
         const routine = WEEKLY_GYM_SCHEDULE[now.getDay()]?.title || 'Gym';
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(`Nusi · Gym: ${routine}`, {
             body: 'Time for your session. Stay disciplined.',
-            icon: '/favicon.ico',
+            icon: import.meta.env.BASE_URL + 'icon.svg',
           });
         }
       }
     }, 15000);
 
     return () => clearInterval(checkInterval);
-  }, [settings.notifications.scheduleReminders]);
+  }, [settings.notifications.scheduleReminders, settings.notifications.soundEnabled, settings.notifications.quietRestDays, settings.notifications.quietHoursStart, settings.notifications.quietHoursEnd, selectedPath]);
+
+  // Random istighfar reminders run only while the app is open; the browser may suspend background timers.
+  useEffect(() => {
+    if (!settings.notifications.randomIstighfar) return;
+    const reminderInterval = setInterval(() => {
+      if (Math.random() > 0.45) return;
+      const now = new Date();
+      if (settings.notifications.quietRestDays && selectedPath === 'rest') return;
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const startParts = settings.notifications.quietHoursStart.split(':').map(Number);
+      const endParts = settings.notifications.quietHoursEnd.split(':').map(Number);
+      const quietStart = startParts[0] * 60 + startParts[1];
+      const quietEnd = endParts[0] * 60 + endParts[1];
+      const quiet = quietStart === quietEnd ? false : quietStart < quietEnd ? currentMinutes >= quietStart && currentMinutes < quietEnd : currentMinutes >= quietStart || currentMinutes < quietEnd;
+      if (quiet || !('Notification' in window) || Notification.permission !== 'granted') return;
+      new Notification('Nusi · Istighfar', {
+        body: settings.notifications.lockScreenPrivacy ? 'Take a quiet moment for istighfar and renew your intention.' : 'Take a moment to say Astaghfirullah 100 times. ' + settings.loveStrengtheningNotes,
+        icon: import.meta.env.BASE_URL + 'icon.svg',
+      });
+    }, 2 * 60 * 60 * 1000);
+    return () => clearInterval(reminderInterval);
+  }, [settings.notifications.randomIstighfar, settings.notifications.quietRestDays, settings.notifications.quietHoursStart, settings.notifications.quietHoursEnd, settings.notifications.lockScreenPrivacy, settings.loveStrengtheningNotes, selectedPath]);
 
   // Focus timer runner
   useEffect(() => {
@@ -481,7 +564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!prev || !prev.isRunning || prev.isPaused) return prev;
         if (prev.remainingSeconds <= 1) {
           // Play ringing bell alarm as requested!
-          playFocusRingAlarm();
+          if (settings.notifications.soundEnabled) playFocusRingAlarm();
           document.title = '🔔 Focus Completed! | Nusi';
 
           const elapsedMins = Math.ceil(prev.durationMinutes);
@@ -499,10 +582,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               )
             );
           }
-          if ('Notification' in window && Notification.permission === 'granted') {
+          if (settings.notifications.focusReminders && 'Notification' in window && Notification.permission === 'granted') {
             new Notification('Nusi · Focus Finished 🔔', {
-              body: `Completed ${elapsedMins}m of focus on ${prev.taskTitle}. Time to rest or switch tasks.`,
-              icon: '/icon.svg',
+              body: settings.notifications.lockScreenPrivacy ? 'Your focus session is complete. Take a short break before the next step.' : `Completed ${elapsedMins}m of focus on ${prev.taskTitle}. Time to rest or switch tasks.`,
+              icon: import.meta.env.BASE_URL + 'icon.svg',
             });
           }
           return null;
@@ -522,19 +605,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [focusSession]);
+  }, [focusSession, settings.notifications.focusReminders, settings.notifications.soundEnabled, settings.notifications.lockScreenPrivacy]);
 
   // Actions
   const toggleTask = (id: string) => {
     setTasks((cur) =>
-      cur.map((t) => (t.id === id ? { ...t, completed: !t.completed, completedAt: Date.now() } : t))
+      cur.map((t) => t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? Date.now() : undefined } : t)
     );
   };
 
   const logQuranPage = (delta: number) => {
     setQuran((cur) => {
       const nextPages = Math.max(0, Math.min(cur.targetPages, cur.completedPagesToday + delta));
-      return { ...cur, completedPagesToday: nextPages };
+      const dayIndex = (currentTime.getDay() + 6) % 7;
+      const weeklyCompletedDays = [...cur.weeklyCompletedDays];
+      weeklyCompletedDays[dayIndex] = nextPages >= cur.targetPages;
+      return { ...cur, completedPagesToday: nextPages, weeklyCompletedDays };
     });
   };
 
@@ -547,22 +633,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetCurrentStreak = () => {
-    setStreak((cur) => ({
-      ...cur,
-      current: 0,
-      history: [
-        ...cur.history,
-        { date: new Date().toISOString().split('T')[0], streak: cur.current, reset: true },
-      ],
-    }));
+    const today = localDateKey(currentTime);
+    setStreak((cur) => ({ ...cur, current: 0, startDate: today, history: [...cur.history, { date: today, streak: cur.current, reset: true }] }));
+  };
+
+  const confirmStreakDay = () => {
+    const today = localDateKey(currentTime);
+    const yesterdayDate = new Date(currentTime);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = localDateKey(yesterdayDate);
+    setStreak((cur) => {
+      if (cur.history.some((entry) => entry.date === today && !entry.reset)) return cur;
+      const lastSuccess = [...cur.history].reverse().find((entry) => !entry.reset);
+      const nextCurrent = lastSuccess && lastSuccess.date === yesterday ? cur.current + 1 : 1;
+      return { ...cur, current: nextCurrent, best: Math.max(cur.best, nextCurrent), startDate: nextCurrent === 1 ? today : cur.startDate, history: [...cur.history, { date: today, streak: nextCurrent }] };
+    });
   };
 
   const startFocus = (durationMinutes: number, task?: { id?: string; title: string }) => {
-    const totalSecs = durationMinutes * 60;
+    const safeDuration = Math.max(1, Math.min(180, Math.round(durationMinutes)));
+    const totalSecs = safeDuration * 60;
     setFocusSession({
       taskId: task?.id,
       taskTitle: task?.title || 'General Focus',
-      durationMinutes,
+      durationMinutes: safeDuration,
       remainingSeconds: totalSecs,
       isRunning: true,
       isPaused: false,
@@ -654,7 +748,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { completed, unfinished };
   }, [tasks]);
 
-  const weeklyRingsFraction = useMemo(() => [0.85, 1.0, 0.75, 0.65, 0.4, 0, 0], []);
+  const weeklyRingsFraction = useMemo(() => weeklyFocusMinutes.map((minutes) => Math.max(0, Math.min(1, minutes / dailyFocusGoalMinutes))), [weeklyFocusMinutes, dailyFocusGoalMinutes]);
 
   return (
     <AppContext.Provider
@@ -685,6 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isFriday,
         streak,
         resetCurrentStreak,
+        confirmStreakDay,
         focusSession,
         startFocus,
         pauseFocus,

@@ -275,7 +275,7 @@ export const SettingsScreen: React.FC = () => {
               </span>
             </div>
             <span className="text-[10px] text-white/45 block mt-0.5">
-              Alarms sound even when phone is locked or app is in background
+              Browser reminders work while Nusi is running; background delivery varies by device and browser.
             </span>
           </div>
 

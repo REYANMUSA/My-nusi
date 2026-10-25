@@ -60,7 +60,7 @@ export const NotificationModal: React.FC = () => {
               Time for school.
             </h4>
             <p className="text-[11px] text-white/70 mt-0.5">
-              Maths starts at 8:00 AM.
+              School starts at 7:00 AM.
             </p>
           </div>
 

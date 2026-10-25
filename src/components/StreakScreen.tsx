@@ -4,8 +4,12 @@ import { useApp } from '../context/AppContext';
 import { STREAK_MILESTONES } from '../data/constants';
 
 export const StreakScreen: React.FC = () => {
-  const { streak, resetCurrentStreak, settings, accentConfig } = useApp();
+  const { streak, resetCurrentStreak, confirmStreakDay, settings, accentConfig } = useApp();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const now = new Date();
+  const todayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const didLogToday = streak.history.some((entry) => entry.date === todayKey && !entry.reset);
 
   const cardStyle = settings.reduceTransparency
     ? 'solid-panel'
@@ -82,18 +86,29 @@ export const StreakScreen: React.FC = () => {
         </div>
       </section>
 
-      {/* Reset Streak Trigger Card */}
-      <section className={`p-4 sm:p-5 ${cardStyle}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xs font-semibold text-white/80">
-              Reset current streak
-            </h3>
-            <p className="text-[11px] text-white/40 mt-0.5">
-              Best streak and history remain preserved
+      {/* Honest daily check-in and explicit reset */}
+      <section className={`p-4 sm:p-5 ${cardStyle} space-y-4`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold text-white/90">Today's check-in</h3>
+            <p className="text-[11px] text-white/45 mt-0.5">
+              Confirm your no-contact goal honestly, once per day.
             </p>
           </div>
-
+          <button
+            onClick={confirmStreakDay}
+            disabled={didLogToday}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            style={{ backgroundColor: didLogToday ? 'rgba(255,255,255,0.10)' : accentConfig.hex, color: didLogToday ? 'white' : '#111318' }}
+          >
+            {didLogToday ? "Logged today ✓" : "Confirm today"}
+          </button>
+        </div>
+        <div className="border-t border-white/10 pt-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-semibold text-white/80">Reset current streak</h3>
+            <p className="text-[11px] text-white/40 mt-0.5">Best streak and history remain preserved.</p>
+          </div>
           <button
             onClick={() => setShowResetConfirm(true)}
             className="px-3.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/20 transition-colors cursor-pointer"

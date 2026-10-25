@@ -1,18 +1,18 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "Nusi — Personal Daily Progress",
   "short_name": "Nusi",
-  "description": "Private, minimalist daily discipline, Salat, focus, and gym tracker.",
-  "start_url": "/",
-  "scope": "/",
+  "description": "A personal planner for faith, focus, school, Qur'an revision and training.",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#17181C",
   "theme_color": "#17181C",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "192x192 512x512",
+      "src": "./icon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }
